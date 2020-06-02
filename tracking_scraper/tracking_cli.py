@@ -125,8 +125,10 @@ def updateStatuses():
 def main():
 
 	log("Tracking CLI", color="cyan", figlet=True)
-	log("Welcome to the Tracking CLI", "cyan")
+	log("Welcome to the Tracking CLI!", "cyan")
 	log("Press Ctrl^C to exit.", "cyan")
+	# TODO - extend to other services
+	log("Presently limited to USPS tracking numbers.", "cyan")
 
 	while (True):
 		# take in request
