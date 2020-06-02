@@ -1,1 +1,1 @@
-{"92001902004365000206816121": {"company": "USPS", "status": "Not yet requested"}}
+{"92001902004365000206816121": {"company": "USPS", "status": "May 19, 2020 \r\n                    at 10:27 am; Delivered, In/At Mailbox; NEWARK,\u00a0NJ\u00a007105\u00a0"}}

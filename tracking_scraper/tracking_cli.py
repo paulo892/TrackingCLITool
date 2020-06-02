@@ -15,6 +15,7 @@ from PyInquirer import (Token, ValidationError, Validator, print_json, prompt,
                         style_from_dict)
 from pyfiglet import figlet_format
 
+# misc imports for styling
 try:
     import colorama
     colorama.init()
@@ -27,6 +28,9 @@ except ImportError:
     colored = None
 
 
+UPDATES_TRIGGERED_THIS_SESSION = 0
+
+
 # styles for CLI
 style = style_from_dict({
     Token.QuestionMark: '#fac731 bold',
@@ -37,18 +41,6 @@ style = style_from_dict({
     Token.Pointer: '#673ab7 bold',
     Token.Question: '',
 })
-
-class CustomCrawler:
-	def __init__(self):
-		self.output = None
-		self.process = CrawlerProcess(settings={'LOG_ENABLED': False})
-
-	def yield_output(self, data):
-		self.output = data
-
-	def crawl(self, cls):
-		self.process.crawl(cls, args={'callback': self.yield_output})
-		self.process.start()
 
 # logs data to the command line
 def log(string, color, font="slant", figlet=False):
@@ -87,30 +79,50 @@ def askNumber():
 	answers = prompt(questions, style=style)
 	return answers
 
+# asks user for tracking number for deletion
+def askNumberDeletion():
+	questions = [
+		{
+			'type': 'input',
+			'name': 'tracking_number',
+			'message': 'Please enter tracking number to be deleted.'
+		}
+	]
+
+	answers = prompt(questions, style=style)
+	return answers
+
 # TODO
 # determines company of tracking number
 def companyToNumber(num):
 	# presently just assumes USPS lmao
 	return 'USPS'
 
+# TODO
+# updates statuses of tracked numbers
+def updateStatuses():
+	global UPDATES_TRIGGERED_THIS_SESSION
 
-# gets status of delivery by number
-def getStatus(num, comp):
+	# TODO - fix this bug
+	# limits number of updates per session to one
+	if UPDATES_TRIGGERED_THIS_SESSION >= 1:
+		log('Please log out of the service to update again.', 'cyan')
+		return
 
 	# initializes crawling process
-	crawler = CustomCrawler()
-	crawler.crawl(TrackingSpider, args={'company': comp, 'num': num})
+	process = CrawlerProcess({
+                'USER_AGENT': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                'LOG_LEVEL': 'WARNING',
+            })
+	process.crawl(TrackingSpider)
+	process.start()
+	process.stop()
 
-	# TODO read result from the text file, maybe
+	UPDATES_TRIGGERED_THIS_SESSION += 1
 	
 
 @click.command()
 def main():
-	# loads the JSON file with tracking information
-	info = open("tracking_info.txt", "r")
-	contents = info.read()
-	info_dict = ast.literal_eval(contents)
-	info.close()
 
 	log("Tracking CLI", color="cyan", figlet=True)
 	log("Welcome to the Tracking CLI", "cyan")
@@ -122,17 +134,30 @@ def main():
 
 		# if request empty, returns with error
 		if len(request) == 0:
-			log("Goodbye :)", "green")
+			log("Goodbye :)", "cyan")
 			exit(0)
 
 		# if request is "see_all_entries"...
 		if request['request_type'] == "see_all_entries":
+
+			# loads the tracking file
+			info = open("tracking_info.txt", "r")
+			contents = info.read()
+			info_dict = ast.literal_eval(contents)
+			info.close()
+
 			# prints all of the entries
 			for k in info_dict:
-				print(k + '(' + info_dict[k]['company'] + ') - ' + info_dict[k]['status'])
+				log(k + '(' + info_dict[k]['company'] + ') - ' + info_dict[k]['status'], 'cyan')
 
 		# if request is "add_entry"...
 		if request['request_type'] == 'add_entry':
+
+			# loads the tracking file
+			info = open("tracking_info.txt", "r")
+			contents = info.read()
+			info_dict = ast.literal_eval(contents)
+			info.close()
 
 			# asks user for tracking number
 			number = askNumber()
@@ -140,26 +165,49 @@ def main():
 
 			# if number in dict, informs user and continues
 			if number in info_dict:
-				log()
+				log('Number already being tracked!', 'cyan')
+				continue
 
 			# determines which company number belongs to
 			comp = companyToNumber(number)
 
 			# updates the entry in the text file
-			print(number)
 			info_dict[number] = {'company': comp, 'status': 'Not yet requested'}
 
 			# writes the updated dict to the file
 			with open('tracking_info.txt', 'w') as file:
 				file.write(json.dumps(info_dict))
 
-			# gets the status of the delivery
-			#status = getStatus(number, comp)
+			# logs the updated file
+			for k in info_dict:
+				log(k + '(' + info_dict[k]['company'] + ') - ' + info_dict[k]['status'], 'cyan')
 
+		# if request is "delete_entry"
+		if request['request_type'] == 'delete_entry':
 
+			# loads the tracking file
+			info = open("tracking_info.txt", "r")
+			contents = info.read()
+			info_dict = ast.literal_eval(contents)
+			info.close()
 
+			# asks user for tracking number
+			number = askNumberDeletion()
+			number = number['tracking_number']
 
+			# if number not in dict, informs user and continues
+			if number not in info_dict:
+				log('Number not being tracked!', 'cyan')
+				continue
 
+			# deletes the key-value pair
+			del info_dict[number]
+			log(number + " successfully deleted!", 'cyan')
+
+		# if request is "update_entries"
+		if request['request_type'] == 'update_entries':
+
+			updateStatuses()
 
 
 if __name__ == '__main__':
